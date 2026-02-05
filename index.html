@@ -3,17 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RecipeJS - Your Functional Cooking Companion</title>
+    <title>RecipeJS - Functional Cooking Companion</title>
+    
     <link rel="stylesheet" href="style.css">
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
     
     <header>
         <h1>🍳 RecipeJS</h1>
         <p>Your Functional Cooking Companion</p>
+        
+        <div class="search-container">
+            <i class="fas fa-search search-icon"></i>
+            <input type="text" id="search-input" placeholder="Search recipes, ingredients...">
+            <button id="clear-search" class="hidden"><i class="fas fa-times"></i></button>
+        </div>
     </header>
     
     <main>
+        <div id="controls">
+            <div class="control-group">
+                <button class="filter-btn active" data-filter="all">Show All</button>
+                <button class="filter-btn" data-filter="favorites">Favorites ❤️</button>
+                <button class="filter-btn" data-filter="easy">Easy</button>
+                <button class="filter-btn" data-filter="medium">Medium</button>
+                <button class="filter-btn" data-filter="hard">Hard</button>
+                <button class="filter-btn" data-filter="quick">Quick (< 30m)</button>
+            </div>
+            
+            <div class="control-group">
+                <button class="sort-btn active" data-sort="none">Default Order</button>
+                <button class="sort-btn" data-sort="name">Sort by Name (A-Z)</button>
+                <button class="sort-btn" data-sort="time">Sort by Time</button>
+            </div>
+        </div>
+
+        <div id="recipe-counter">Showing 0 recipes</div>
+
         <div id="recipe-container">
             </div>
     </main>
