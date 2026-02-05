@@ -270,9 +270,23 @@ const RecipeApp = (() => {
     ];
 
     // ============================================
-    // DOM REFERENCES
+    // PRIVATE: STATE
+    // ============================================
+    let currentFilter = 'all';
+    let currentSort = 'none';
+    let searchQuery = '';
+    let favorites = JSON.parse(localStorage.getItem('recipeFavorites')) || [];
+    let debounceTimer;
+
+    // ============================================
+    // PRIVATE: DOM REFERENCES
     // ============================================
     const recipeContainer = document.querySelector('#recipe-container');
+    const filterButtons = document.querySelectorAll('.filter-btn');
+    const sortButtons = document.querySelectorAll('.sort-btn');
+    const searchInput = document.querySelector('#search-input');
+    const clearSearchBtn = document.querySelector('#clear-search');
+    const recipeCountDisplay = document.querySelector('#recipe-count');
 
     // ============================================
     // RECURSIVE STEPS RENDERING
@@ -323,8 +337,19 @@ const RecipeApp = (() => {
     
     //create single recipe card
     const createRecipeCard = (recipe) => {
+        // Check if favorited
+        const isFavorited = favorites.includes(recipe.id);
+        const heartIcon = isFavorited ? '❤️' : '🤍';
+        
         return `
             <div class="recipe-card" data-id="${recipe.id}">
+                
+                <!-- NEW: Favorite Button -->
+                <button class="favorite-btn ${isFavorited ? 'favorited' : ''}" 
+                        data-recipe-id="${recipe.id}">
+                    ${heartIcon}
+                </button>
+                
                 <h3>${recipe.title}</h3>
                 <div class="recipe-meta">
                     <span>⏱️ ${recipe.time} min</span>
@@ -360,7 +385,56 @@ const RecipeApp = (() => {
     };
 
     // ============================================
-    // RENDERING
+    // PRIVATE: UI HELPER FUNCTIONS
+    // ============================================
+    
+    // Update active button states
+    const updateActiveButtons = () => {
+        // Update filter buttons
+        filterButtons.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.filter === currentFilter);
+        });
+        
+        // Update sort buttons
+        sortButtons.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.sort === currentSort);
+        });
+    };
+    
+    // Update recipe counter
+    const updateRecipeCounter = (showing, total) => {
+        if (recipeCountDisplay) {
+            recipeCountDisplay.textContent = `Showing ${showing} of ${total} recipes`;
+        }
+    };
+    
+    // ============================================
+    // PRIVATE: FAVORITES MANAGEMENT
+    // ============================================
+    
+    // Save favorites to localStorage
+    const saveFavorites = () => {
+        localStorage.setItem('recipeFavorites', JSON.stringify(favorites));
+    };
+    
+    // Toggle favorite status
+    const toggleFavorite = (recipeId) => {
+        const id = parseInt(recipeId);
+        
+        if (favorites.includes(id)) {
+            // Remove from favorites
+            favorites = favorites.filter(favId => favId !== id);
+        } else {
+            // Add to favorites
+            favorites.push(id);
+        }
+        
+        saveFavorites();
+        updateDisplay();
+    };
+
+    // ============================================
+    // PRIVATE: RENDER FUNCTIONS
     // ============================================
     
     //render recipes to the DOM
@@ -373,7 +447,7 @@ const RecipeApp = (() => {
     };
 
     // ============================================
-    // EVENT HANDLERS
+    // PRIVATE: EVENT HANDLERS
     // ============================================
     
     // Handle toggle button clicks using event delegation
@@ -404,6 +478,66 @@ const RecipeApp = (() => {
             }
         }
     };
+    
+    // Handle filter button clicks
+    const handleFilterClick = (event) => {
+        const filterType = event.target.dataset.filter;
+        if (filterType && filterType !== currentFilter) {
+            currentFilter = filterType;
+            updateDisplay();
+        }
+    };
+    
+    // Handle sort button clicks
+    const handleSortClick = (event) => {
+        const sortType = event.target.dataset.sort;
+        if (sortType && sortType !== currentSort) {
+            currentSort = sortType;
+            updateDisplay();
+        }
+    };
+    
+    // Search input handler with debouncing
+    const handleSearchInput = (event) => {
+        const query = event.target.value;
+        
+        // Show/hide clear button
+        if (clearSearchBtn) {
+            clearSearchBtn.style.display = query ? 'block' : 'none';
+        }
+        
+        // Implement debouncing
+        clearTimeout(debounceTimer);
+        
+        debounceTimer = setTimeout(() => {
+            searchQuery = query;
+            updateDisplay();
+        }, 300);
+    };
+    
+    // Clear search handler
+    const handleClearSearch = () => {
+        if (searchInput) {
+            searchInput.value = '';
+        }
+        searchQuery = '';
+        if (clearSearchBtn) {
+            clearSearchBtn.style.display = 'none';
+        }
+        updateDisplay();
+    };
+    
+    // Favorite button handler (event delegation)
+    const handleFavoriteClick = (event) => {
+        if (!event.target.classList.contains('favorite-btn')) {
+            return;
+        }
+        
+        const recipeId = event.target.dataset.recipeId;
+        if (recipeId) {
+            toggleFavorite(recipeId);
+        }
+    };
 
     // ============================================
     // EVENT LISTENER SETUP
@@ -411,31 +545,70 @@ const RecipeApp = (() => {
     
     const setupEventListeners = () => {
         // Event delegation for toggle buttons
-        // One listener on parent handles all toggle buttons
         recipeContainer.addEventListener('click', handleToggleClick);
+        
+        // Filter button listeners
+        filterButtons.forEach(btn => {
+            btn.addEventListener('click', handleFilterClick);
+        });
+        
+        // Sort button listeners
+        sortButtons.forEach(btn => {
+            btn.addEventListener('click', handleSortClick);
+        });
+        
+        // Search input listener
+        if (searchInput) {
+            searchInput.addEventListener('input', handleSearchInput);
+        }
+        
+        // Clear search button listener
+        if (clearSearchBtn) {
+            clearSearchBtn.addEventListener('click', handleClearSearch);
+        }
+        
+        // Favorite button listener (event delegation)
+        recipeContainer.addEventListener('click', handleFavoriteClick);
         
         console.log('Event listeners attached!');
     };
 
     // ============================================
-    // UPDATE DISPLAY FUNCTION
+    // PRIVATE: UPDATE DISPLAY FUNCTION
     // ============================================
     
     const updateDisplay = () => {
-        // For now, just render all recipes
-        // This can be extended for filtering/sorting later
-        renderRecipes(recipes);
-        console.log(`Displaying ${recipes.length} recipes`);
+        let recipesToDisplay = recipes;
+        
+        // Apply search FIRST
+        recipesToDisplay = filterBySearch(recipesToDisplay, searchQuery);
+        
+        // Then apply filters
+        recipesToDisplay = applyFilter(recipesToDisplay, currentFilter);
+        
+        // Then apply sorts
+        recipesToDisplay = applySort(recipesToDisplay, currentSort);
+        
+        // Update counter
+        updateRecipeCounter(recipesToDisplay.length, recipes.length);
+        
+        // Render
+        renderRecipes(recipesToDisplay);
+        updateActiveButtons();
+        
+        console.log(`Displaying ${recipesToDisplay.length} of ${recipes.length} recipes`);
     };
 
     // ============================================
     // INITIALIZATION FUNCTION
     // ============================================
     const init = () => {
-        console.log('RecipeApp initializing...');
+        console.log('🍳 RecipeJS initializing...');
         setupEventListeners();
         updateDisplay();
-        console.log('RecipeApp ready!');
+        console.log('✅ RecipeJS ready!');
+        console.log(`📊 ${recipes.length} recipes loaded`);
+        console.log(`❤️  ${favorites.length} favorites saved`);
     };
 
     // ============================================
